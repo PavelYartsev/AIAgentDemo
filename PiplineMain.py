@@ -2,7 +2,7 @@ import json
 
 import GeminiClient
 import JsonExtractor
-import AIClient
+import MistralClient
 from PiiScanner import PiiScanner
 from PiiReport import PiiReport
 from PiiMasker import PiiMasker
@@ -37,7 +37,8 @@ class PipelineMain:
 
         # STAGE 3. GENERATE SCENARIOS
         print("STAGE 3: Generating scenarios via LLM...")
-        raw_scenarios = AIClient.GeminiClient.call(final_prompt)
+        # raw_scenarios = GeminiClient.GeminiClient.call(final_prompt)
+        raw_scenarios = MistralClient.MistralClient.call(final_prompt)
         FilesUtil.write("generated/scenarios_raw.json", raw_scenarios)
 
         scenarios = PipelineMain.extract_assistant_content(raw_scenarios)
@@ -50,37 +51,39 @@ class PipelineMain:
         )
         FilesUtil.write("generated/testcases_prompt.txt", json_prompt)
 
-        raw_json = AIClient.GeminiClient.call(json_prompt)
+        # raw_json = GeminiClient.GeminiClient.call(json_prompt)
+        raw_json = MistralClient.MistralClient.call(json_prompt)
         FilesUtil.write("generated/testcases_raw.json", raw_json)
 
         llm_json_text = PipelineMain.extract_assistant_content(raw_json)
         FilesUtil.write("generated/testcases_llm.txt", llm_json_text)
 
-pure_json = JsonExtractor.extract_json(llm_json_text)
+        pure_json = JsonExtractor.extract_json(llm_json_text)
         FilesUtil.write("generated/testcases.json", pure_json)
 
         print("Testcases generated: generated/testcases.json")
         print("=== AI QA PIPELINE FINISHED ===")
 
-    @staticmethod
-    def extract_assistant_content(raw_json: str) -> str:
-        """
-        Извлекает все текстовое содержимое из ответа Gemini API.
-        Ожидаемая структура - это JSON-объект со списком "candidates",
-        где у каждого кандидата есть "content" с "parts", которые содержат "text".
-        """
-        try:
-            data = json.loads(raw_json)
-            all_text_parts = []
-            for candidate in data.get("candidates", []):
-                parts = candidate.get("content", {}).get("parts", [])
-                for part in parts:
-                    all_text_parts.append(part.get("text", ""))
-            return "".join(all_text_parts)
-        except (json.JSONDecodeError, IndexError, KeyError) as e:
-            raise RuntimeError(
-                "Failed to extract assistant content from LLM response"
-            ) from e
+
+@staticmethod
+def extract_assistant_content(raw_json: str) -> str:
+    """
+    Извлекает все текстовое содержимое из ответа Gemini API.
+    Ожидаемая структура - это JSON-объект со списком "candidates",
+    где у каждого кандидата есть "content" с "parts", которые содержат "text".
+    """
+    try:
+        data = json.loads(raw_json)
+        all_text_parts = []
+        for candidate in data.get("candidates", []):
+            parts = candidate.get("content", {}).get("parts", [])
+            for part in parts:
+                all_text_parts.append(part.get("text", ""))
+        return "".join(all_text_parts)
+    except (json.JSONDecodeError, IndexError, KeyError) as e:
+        raise RuntimeError(
+            "Failed to extract assistant content from LLM response"
+        ) from e
 
 
 if __name__ == "__main__":
