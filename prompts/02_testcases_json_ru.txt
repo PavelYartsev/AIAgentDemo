@@ -1,0 +1,31 @@
+Твоя задача конвертировать тестовые сценарии по заполнению форму регистрации в структурированные JSON тесткейсы
+
+Правила:
+Критичные
+- Возвращать ТОЛЬКО в формате raw JSON
+- Не использовать ```
+- Никаких комментариев
+- Не использовать объяснения
+- JSON должен начинаться с { и заканчиваться }
+- Не использовать markdown
+
+Формат ожидаемого файла JSON:
+{
+  "testcases": [
+    {
+      "id": "LOGIN_01",
+      "title": "Valid login",
+      "type": "positive",
+      "steps": [
+        "Open login page",
+        "Enter valid username",
+        "Enter valid password",
+        "Click login"
+      ],
+      "expected": "Products page is displayed"
+    }
+  ]
+}
+
+Сценарии:
+{{SCENARIOS}}

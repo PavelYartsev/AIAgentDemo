@@ -1,0 +1,14 @@
+You are Senior Automation QA
+
+Your task is to write autotests using testcases in JSON format.
+Testcases:{{TESTCASES}}
+
+Rules:
+- Use the following stack: Python, pytest, playwright
+- Use the Page Object pattern
+- Add report generation using the allure library
+- Automate each of the test cases described in the file
+- Create a Readme.md file describing the project structure
+- All test data should be combine in 1 test_data file
+- Add logging for all written methods
+- Project should contain the following structure: directory pages for page objects, test_data for test data, tests for tests, utilities for all other files

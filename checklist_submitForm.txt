@@ -1,0 +1,25 @@
+Website: https://demoqa.com/automation-practice-form
+Scope: Successfully filling out and submitting the registration form
+
+Checklist:
+Input Fields
+Verify the first name (First Name) and last name (Last Name).
+Verify the correct email (Email).
+Verify the 10-digit mobile number (Mobile).
+Verify the current address (Current Address).
+
+Required Fields and Options
+Verify the gender selection (Gender) — one of the options: Male/Female/Other.
+Verify the date of birth selection (Date of Birth).
+Verify the subject(s) entered in Subjects with autocomplete selection.
+Verify the selection of hobbies (Hobbies) using checkboxes.
+
+Additional Actions
+Verify the file upload in the Picture field (Upload Picture).
+Verify the State selection from the drop-down list.
+Verify the City selection after selecting the State.
+
+Submitting the form and results
+Verify that the Submit button is clickable when the required fields are filled in correctly.
+Click Submit and check that the modal window with the title "Thanks for submitting the form" appears.
+Verify that the results table displays all entered data (name, email, mobile phone, date of birth, subjects, hobbies, address, state, and city).
