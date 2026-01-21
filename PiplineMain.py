@@ -73,7 +73,7 @@ class PipelineMain:
         a list of file and directory paths.
         Assumes an indented tree-like structure.
         """
-        structure_start_match = re.search(r"Project Structure:\n", text)
+        structure_start_match = re.search(r"Project Structure\n", text)
         if not structure_start_match:
             print("Warning: 'Project Structure:' section not found in LLM output.")
             return []
@@ -124,27 +124,85 @@ class PipelineMain:
     @staticmethod
     def _parse_file_contents(text: str, root_dir: str = "autotests") -> dict[str, str]:
         """
-        Parses the file content sections from the LLM output.
-        Assumes content blocks are preceded by '#### path/to/file.py'
-        and contain Markdown code blocks.
+        Parses file content sections from LLM output using a robust line-by-line
+        state machine approach, which is resilient to formatting variations.
         """
         file_contents = {}
-        # Pattern to find '#### path/to/file' followed by a code block.
-        # The path is relative and needs the root_dir prepended.
-        pattern = re.compile(
-            r"####\s+([^\n]+)\n```(?:\w+)?\n(.*?)\n```",
-            re.DOTALL
-        )
+        lines = text.splitlines()  # Use splitlines to handle \r\n vs \n
 
-        for match in pattern.finditer(text):
-            # The captured path is relative, e.g., 'pages/base_page.py'
-            relative_path = match.group(1).strip().replace('\\', '/')
-            # Prepend the root directory to form the full path
-            full_path = f"{root_dir}/{relative_path}"
-            content = match.group(2).strip()
-            file_contents[full_path] = content
+        state = "SEARCHING"  # States: SEARCHING, FOUND_HEADER, IN_CODE_BLOCK
+        current_path = None
+        current_content = []
+
+        for line in lines:
+            if state == "IN_CODE_BLOCK":
+                if line.strip() == "```":
+                    # End of the current code block
+                    if current_path:
+                        full_path = f"{root_dir}/{current_path.replace('\\', '/')}"
+                        file_contents[full_path] = "\n".join(current_content)
+                    
+                    # Reset state to search for the next file
+                    state = "SEARCHING"
+                    current_path = None
+                    current_content = []
+                else:
+                    current_content.append(line)
+                continue
+
+            # In SEARCHING or FOUND_HEADER states, a header line can appear
+            stripped = line.strip()
+            if stripped.startswith('### ') or stripped.startswith('#### '):
+                # Extract the text after '### ' or '#### '
+                path_part = re.sub(r"^(###|####)\s+", "", stripped)
+                # Clean up potential numbering like "1. "
+                path_part = re.sub(r"^\d+\.\s+", "", path_part)
+
+                # Heuristic to distinguish file paths from section titles
+                if '.' in path_part or '/' in path_part or '\\' in path_part:
+                    current_path = path_part.strip().strip("'\"`“”‘’") # Ready to look for a code block
+                    state = "FOUND_HEADER" # Ready to look for a code block
+                else:
+                    # It's a section title (e.g., "### 1. Setting Up the Project")
+                    # Reset and continue searching
+                    state = "SEARCHING"
+                    current_path = None
+                continue
+
+            if state == "FOUND_HEADER":
+                if line.strip().startswith("```"):
+                    # Start of a code block for the found header
+                    state = "IN_CODE_BLOCK"
+                    current_content = [] # Reset content for new file
+        
         return file_contents
 
+    @staticmethod
+    def _generate_tree_string(paths: list[str], root_dir: str) -> str:
+        # Create a nested dict from paths
+        tree = {}
+        for path in sorted(paths):
+            # remove root_dir prefix
+            parts = path.replace(f"{root_dir}/", "", 1).split('/')
+            node = tree
+            for part in parts:
+                node = node.setdefault(part, {})
+
+        # Recursively build the string
+        def build_string(node, indent=""):
+            lines = []
+            sorted_items = sorted(node.items())
+            for i, (name, children) in enumerate(sorted_items):
+                is_last = i == (len(sorted_items) - 1)
+                connector = "└── " if is_last else "├── "
+                lines.append(f"{indent}{connector}{name}")
+                if children:
+                    child_indent = "    " if is_last else "│   "
+                    lines.extend(build_string(children, indent + child_indent))
+            return lines
+
+        tree_lines = build_string(tree)
+        return f"{root_dir}/\n" + "\n".join(tree_lines)
 
     @staticmethod
     def main() -> None:
@@ -222,23 +280,62 @@ class PipelineMain:
         FilesUtil.delete_dir_if_exists(autotests_root)
         FilesUtil.create_dir_if_not_exists(autotests_root)
 
-        # Parse project structure and file contents from LLM output
-        all_paths = PipelineMain._parse_project_structure(autotests_llm_text, root_dir=autotests_root)
-        print(f"--- Parsed Project Structure Paths ---\n{all_paths}\n--------------------------------------")
+        # Parse file contents from LLM output. This is now the single source of truth.
         file_contents_map = PipelineMain._parse_file_contents(autotests_llm_text, root_dir=autotests_root)
 
-        # Create all directories that are part of the structure but are not files
-        for path in all_paths:
-            if path not in file_contents_map:
-                FilesUtil.create_dir_if_not_exists(path)
-                print(f"Created directory: {path}")
+        if not file_contents_map:
+            print("Warning: No file contents were parsed from the LLM output. The 'autotests' directory will be empty.")
 
-        # Write all files
+        # Generate a clean project structure tree string and inject it into README.md
+        if file_contents_map:
+            clean_tree_str = PipelineMain._generate_tree_string(
+                list(file_contents_map.keys()), autotests_root
+            )
+            print("--- Generated Clean Project Structure ---")
+            print(clean_tree_str)
+            print("---------------------------------------")
+
+            readme_key = f"{autotests_root}/README.md"
+            if readme_key in file_contents_map:
+                print(f"Injecting clean structure into {readme_key}...")
+                readme_content = file_contents_map[readme_key]
+                
+                # This regex finds "## Project Structure" and makes the code block after it optional
+                pattern = re.compile(
+                    r"(#{2,3}\s+Project Structure\s*\n+)(?:```.*?```)?", 
+                    re.DOTALL | re.IGNORECASE
+                )
+                
+                replacement = r"\1" + f"```\n{clean_tree_str}\n```"
+                new_readme_content, num_replacements = pattern.subn(replacement, readme_content)
+
+                if num_replacements > 0:
+                    file_contents_map[readme_key] = new_readme_content
+                    print("Injection successful.")
+                else:
+                    print("Warning: Could not find a 'Project Structure' section to replace in README.md.")
+
+
+        # Write all files. Parent directories are created automatically by FilesUtil.write.
         for file_path, content in file_contents_map.items():
             FilesUtil.write(file_path, content)
             print(f"Saved file: {file_path}")
 
         print("Autotests generated and integrated into 'autotests' project.")
+
+        # STAGE 6. AI CODE REVIEW
+        print("STAGE 6: AI code review...")
+        generated_test = FilesUtil.read("generated/autotests.txt")
+        review_prompt = FilesUtil.read("prompts/04_code_review.txt").replace("{{CODE}}", generated_test)
+        FilesUtil.write("generated/code_review_prompt.txt", review_prompt)
+
+        raw_review = MistralClient.MistralClient.call(review_prompt)
+        FilesUtil.write("generated/code_review_raw.json", raw_review)
+
+        review = PipelineMain.extract_assistant_content(raw_review)
+        FilesUtil.write("generated/code_review.txt", review)
+
+        print("AI code review saved: generated/code_review.txt")
         print("=== AI QA PIPELINE FINISHED ===")
 
 
