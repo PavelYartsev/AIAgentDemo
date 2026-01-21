@@ -1,0 +1,13 @@
+{
+  "valid_first_name": "John",
+  "valid_last_name": "Doe",
+  "valid_email": "john.doe@example.com",
+  "valid_mobile": "1234567890",
+  "valid_current_address": "123 Main St",
+  "valid_date_of_birth": "01 Jan 1990",
+  "valid_subject": "Math",
+  "valid_hobby": "Sports",
+  "valid_state": "NCR",
+  "valid_city": "Delhi",
+  "valid_picture_path": "path/to/picture.jpg"
+}
