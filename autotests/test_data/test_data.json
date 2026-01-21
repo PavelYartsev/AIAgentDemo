@@ -1,0 +1,18 @@
+{
+  "registration": {
+    "valid_data": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "email": "john.doe@example.com",
+      "mobile": "1234567890",
+      "current_address": "123 Main St",
+      "gender": "Male",
+      "date_of_birth": "01 Jan 1990",
+      "subjects": ["Math", "Physics"],
+      "hobbies": ["Sports", "Reading"],
+      "picture": "path/to/picture.jpg",
+      "state": "NCR",
+      "city": "Delhi"
+    }
+  }
+}
