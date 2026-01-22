@@ -1,5 +1,6 @@
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+# For more information see:
+# https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
 name: Python application
 
@@ -14,34 +15,59 @@ permissions:
 
 jobs:
   build:
-
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v3
-      with:
-        python-version: "3.12"
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
-      run: |
-        pytest
-    - name: Upload AI artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: ai-qa-artifacts
-        path: |
-               generated/
-               src/test/java/org/demo/generated/
-               target/surefire-reports/
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest allure-pytest
+          if (Test-Path "requirements.txt") {
+            pip install -r requirements.txt
+          }
+
+      - name: Lint with flake8
+        shell: pwsh
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Test with pytest and collect Allure results
+        shell: pwsh
+        run: |
+          mkdir generated 2>$null
+          pytest --alluredir=generated/allure-results
+
+      # Если нужен CLI Allure для генерации отчёта HTML
+      - name: Install Allure CLI
+        shell: pwsh
+        run: |
+          # Пример установки через scoop; адаптируй под свой способ,
+          # либо закомментируй этот шаг, если отчёт достаточно смотреть из allure-results.
+          if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            irm get.scoop.sh | iex
+          }
+          scoop install allure
+
+      - name: Generate Allure report
+        shell: pwsh
+        run: |
+          allure generate generated/allure-results -o generated/allure-report --clean
+
+      - name: Upload AI artifacts and Allure report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-qa-artifacts
+          path: |
+            generated/
