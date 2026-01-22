@@ -141,7 +141,7 @@ class PipelineMain:
                     if current_path:
                         full_path = f"{root_dir}/{current_path.replace('\\', '/')}"
                         file_contents[full_path] = "\n".join(current_content)
-                    
+
                     # Reset state to search for the next file
                     state = "SEARCHING"
                     current_path = None
@@ -160,8 +160,8 @@ class PipelineMain:
 
                 # Heuristic to distinguish file paths from section titles
                 if '.' in path_part or '/' in path_part or '\\' in path_part:
-                    current_path = path_part.strip().strip("'\"`“”‘’") # Ready to look for a code block
-                    state = "FOUND_HEADER" # Ready to look for a code block
+                    current_path = path_part.strip().strip("'\"`“”‘’")  # Ready to look for a code block
+                    state = "FOUND_HEADER"  # Ready to look for a code block
                 else:
                     # It's a section title (e.g., "### 1. Setting Up the Project")
                     # Reset and continue searching
@@ -173,8 +173,8 @@ class PipelineMain:
                 if line.strip().startswith("```"):
                     # Start of a code block for the found header
                     state = "IN_CODE_BLOCK"
-                    current_content = [] # Reset content for new file
-        
+                    current_content = []  # Reset content for new file
+
         return file_contents
 
     @staticmethod
@@ -271,7 +271,7 @@ class PipelineMain:
 
         print(f"--- Raw LLM Output (autotests.txt) ---\n{autotests_llm_text}\n--------------------------------------")
 
-        # STAGE 5.5: Integrate generated autotests into project structure
+        # Integrate generated autotests into project structure
         print("Integrating generated autotests into 'autotests' project structure...")
 
         autotests_root = "autotests"
@@ -299,13 +299,13 @@ class PipelineMain:
             if readme_key in file_contents_map:
                 print(f"Injecting clean structure into {readme_key}...")
                 readme_content = file_contents_map[readme_key]
-                
+
                 # This regex finds "## Project Structure" and makes the code block after it optional
                 pattern = re.compile(
-                    r"(#{2,3}\s+Project Structure\s*\n+)(?:```.*?```)?", 
+                    r"(#{2,3}\s+Project Structure\s*\n+)(?:```.*?```)?",
                     re.DOTALL | re.IGNORECASE
                 )
-                
+
                 replacement = r"\1" + f"```\n{clean_tree_str}\n```"
                 new_readme_content, num_replacements = pattern.subn(replacement, readme_content)
 
@@ -314,7 +314,6 @@ class PipelineMain:
                     print("Injection successful.")
                 else:
                     print("Warning: Could not find a 'Project Structure' section to replace in README.md.")
-
 
         # Write all files. Parent directories are created automatically by FilesUtil.write.
         for file_path, content in file_contents_map.items():
@@ -336,6 +335,32 @@ class PipelineMain:
         FilesUtil.write("generated/code_review.txt", review)
 
         print("AI code review saved: generated/code_review.txt")
+
+        # STAGE 7. AI BUG REPORT (DESIGN-TIME)
+        print("STAGE 7: Generating AI bug report...")
+        checklist = FilesUtil.read("checklist_submitForm.txt")
+        testcases = FilesUtil.read("generated/testcases.json")
+        code_review = FilesUtil.read("generated/code_review.txt")
+
+        bug_prompt = (
+            FilesUtil.read("prompts/05_bug_report.txt")
+            .replace("{{CHECKLIST}}", checklist)
+            .replace("{{TESTCASES}}", testcases)
+            .replace("{{REVIEW}}", code_review)
+        )
+
+        FilesUtil.write("generated/bug_report_prompt.txt", bug_prompt)
+
+        raw_bug = MistralClient.MistralClient.call(bug_prompt)
+        FilesUtil.write("generated/bug_report_raw.json", raw_bug)
+
+        bug_text = PipelineMain.extract_assistant_content(raw_bug)
+        FilesUtil.write("generated/bug_report_llm.txt", bug_text)
+
+        pure_bug_json = JsonExtractor.JsonExtractor.extract_json(bug_text)
+        FilesUtil.write("generated/bug_report.json", pure_bug_json)
+
+        print("Bug report saved: generated/bug_report.json")
         print("=== AI QA PIPELINE FINISHED ===")
 
 

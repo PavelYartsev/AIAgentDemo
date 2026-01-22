@@ -6,5 +6,7 @@ def pytest_configure(config):
     setup_logger()
 
 @pytest.fixture(scope="session")
-def logger():
-    return logging.getLogger(__name__)
+def playwright():
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as playwright:
+        yield playwright
