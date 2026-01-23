@@ -4,7 +4,7 @@ Scope: Successfully filling out and submitting the registration form
 Checklist:
 Input Fields
 Verify the first name (First Name) and last name (Last Name).
-Verify the correct email (Email).
+Verify the correct email (iartsev.pavel@gmail.com).
 Verify the 10-digit mobile number (Mobile).
 Verify the current address (Current Address).
 

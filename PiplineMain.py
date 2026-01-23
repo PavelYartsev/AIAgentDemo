@@ -1,4 +1,5 @@
 import json
+import os
 
 import GeminiClient
 import JsonExtractor
@@ -123,59 +124,56 @@ class PipelineMain:
 
     @staticmethod
     def _parse_file_contents(text: str, root_dir: str = "autotests") -> dict[str, str]:
-        """
-        Parses file content sections from LLM output using a robust line-by-line
-        state machine approach, which is resilient to formatting variations.
-        """
         file_contents = {}
-        lines = text.splitlines()  # Use splitlines to handle \r\n vs \n
 
-        state = "SEARCHING"  # States: SEARCHING, FOUND_HEADER, IN_CODE_BLOCK
-        current_path = None
-        current_content = []
+        # Находим начало секции "### Project Code"
+        file_contents_start_match = re.search(r"^### Project Code\n", text, re.MULTILINE)
+        if not file_contents_start_match:
+            print("Warning: '### Project Code' section not found in the description text. No files will be parsed.")
+            return file_contents
+
+        text_to_parse = text[file_contents_start_match.end():]
+        lines = text_to_parse.splitlines()
+
+        # Pattern for file headers: "autotests/path/to/file.py" at the start of a line
+        file_header_pattern = re.compile(r"^autotests\/([a-zA-Z0-9_\-.\/]+)") 
+        code_block_pattern = re.compile(r"```(?:[a-zA-Z0-9]+)?\n(.*?)\n```", re.DOTALL)
+
+        current_file_path = None
+        current_file_content_lines = []
+        is_in_code_block_mode = False # To handle content that is not in ``` ``` blocks
 
         for line in lines:
-            if state == "IN_CODE_BLOCK":
-                if line.strip() == "```":
-                    # End of the current code block
-                    if current_path:
-                        full_path = f"{root_dir}/{current_path.replace('\\', '/')}"
-                        file_contents[full_path] = "\n".join(current_content)
+            header_match = file_header_pattern.match(line.strip())
+            
+            if header_match:
+                # If we were collecting content for a previous file, save it
+                if current_file_path:
+                    full_content = "\n".join(current_file_content_lines).strip()
+                    code_match = code_block_pattern.search(full_content)
+                    
+                    content_to_save = code_match.group(1).strip() if code_match else full_content
+                    file_contents[os.path.join(root_dir, current_file_path)] = content_to_save
 
-                    # Reset state to search for the next file
-                    state = "SEARCHING"
-                    current_path = None
-                    current_content = []
-                else:
-                    current_content.append(line)
-                continue
+                # Start collecting content for the new file
+                file_path_raw = header_match.group(1).strip() # Capture without "autotests/" prefix
+                current_file_path = file_path_raw
+                current_file_content_lines = []
+                is_in_code_block_mode = False # Reset for new file
+            elif current_file_path:
+                # Only accumulate if we have a current file being processed
+                current_file_content_lines.append(line)
 
-            # In SEARCHING or FOUND_HEADER states, a header line can appear
-            stripped = line.strip()
-            if stripped.startswith('### ') or stripped.startswith('#### '):
-                # Extract the text after '### ' or '#### '
-                path_part = re.sub(r"^(###|####)\s+", "", stripped)
-                # Clean up potential numbering like "1. "
-                path_part = re.sub(r"^\d+\.\s+", "", path_part)
-
-                # Heuristic to distinguish file paths from section titles
-                if '.' in path_part or '/' in path_part or '\\' in path_part:
-                    current_path = path_part.strip().strip("'\"`“”‘’")  # Ready to look for a code block
-                    state = "FOUND_HEADER"  # Ready to look for a code block
-                else:
-                    # It's a section title (e.g., "### 1. Setting Up the Project")
-                    # Reset and continue searching
-                    state = "SEARCHING"
-                    current_path = None
-                continue
-
-            if state == "FOUND_HEADER":
-                if line.strip().startswith("```"):
-                    # Start of a code block for the found header
-                    state = "IN_CODE_BLOCK"
-                    current_content = []  # Reset content for new file
-
+        # Process the last file after the loop finishes
+        if current_file_path:
+            full_content = "\n".join(current_file_content_lines).strip()
+            code_match = code_block_pattern.search(full_content)
+            content_to_save = code_match.group(1).strip() if code_match else full_content
+            file_contents[os.path.join(root_dir, current_file_path)] = content_to_save
+        
         return file_contents
+
+
 
     @staticmethod
     def _generate_tree_string(paths: list[str], root_dir: str) -> str:
@@ -302,11 +300,11 @@ class PipelineMain:
 
                 # This regex finds "## Project Structure" and makes the code block after it optional
                 pattern = re.compile(
-                    r"(#{2,3}\s+Project Structure\s*\n+)(?:```.*?```)?",
+                    r"(#{2,3}\s+### Project Structure\s*\n+)(?:```.*?```)?",
                     re.DOTALL | re.IGNORECASE
                 )
 
-                replacement = r"\1" + f"```\n{clean_tree_str}\n```"
+                replacement = r"\1" + f"```\n{clean_tree_str.replace('\\', '\\\\')}\n```"
                 new_readme_content, num_replacements = pattern.subn(replacement, readme_content)
 
                 if num_replacements > 0:

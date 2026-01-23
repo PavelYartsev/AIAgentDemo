@@ -4,11 +4,11 @@ import requests
 
 class MistralClient:
     API_URL = "https://api.mistral.ai/v1/chat/completions"
-    API_KEY = os.getenv("MISTRAL_API_KEY")
 
     @classmethod
     def call(cls, prompt: str) -> str:
-        if not cls.API_KEY:
+        api_key = os.getenv("MISTRAL_API_KEY") # Moved API_KEY retrieval here
+        if not api_key:
             raise RuntimeError("MISTRAL_API_KEY not set")
 
         payload = {
@@ -22,7 +22,7 @@ class MistralClient:
 
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {cls.API_KEY}"
+            "Authorization": f"Bearer {api_key}" # Use the dynamically fetched api_key
         }
 
         try:

@@ -19,3 +19,4 @@ class TestcasesParser:
             return model(**data)
         except Exception as e:
             raise RuntimeError("Failed to parse testcases.json") from e
+

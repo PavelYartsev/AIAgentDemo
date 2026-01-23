@@ -1,4 +1,0 @@
-pytest
-pytest-playwright
-allure-pytest
-pytest-html
