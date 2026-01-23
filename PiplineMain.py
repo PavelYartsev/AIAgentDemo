@@ -283,6 +283,24 @@ class PipelineMain:
 
         if not file_contents_map:
             print("Warning: No file contents were parsed from the LLM output. The 'autotests' directory will be empty.")
+            # Ensure autotests directory is created even if no files are parsed
+            FilesUtil.create_dir_if_not_exists(autotests_root)
+        
+        # --- Create __init__.py files in all necessary directories ---
+        all_dirs = set()
+        for file_path in file_contents_map.keys():
+            current_dir = os.path.dirname(file_path)
+            while current_dir and current_dir != autotests_root and current_dir.startswith(autotests_root):
+                all_dirs.add(current_dir)
+                current_dir = os.path.dirname(current_dir)
+        all_dirs.add(autotests_root) # Ensure root is also considered a package
+
+        for d in sorted(list(all_dirs)):
+            init_file_path = os.path.join(d, "__init__.py")
+            if not os.path.exists(init_file_path):
+                FilesUtil.write(init_file_path, "")
+                print(f"Created empty __init__.py in: {d}")
+        # --- End __init__.py creation ---
 
         # Generate a clean project structure tree string and inject it into README.md
         if file_contents_map:

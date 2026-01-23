@@ -14,6 +14,7 @@ Rules:
 - Project should contain the following structure: directory pages for page objects, test_data for test data, tests for tests, utilities for all other files
 - Output file should contains project structure from README.md with title "### Project Structure" and project code only with title '### Project Code'
 - Don't use ``` in output file
+- Create __init__.py files for all packages from this structure
 
 Project root structure (THIS STRUCTURE IS FIXED AND MUST NOT BE CHANGED):
 
@@ -46,6 +47,7 @@ All test files are located inside the "tests" package.
 All page objects are located inside the "pages" package.
 All utilities are located inside the "utilities" package.
 All test data are located inside the "test_data" package.
+All packages MUST contain __init__.py file
 
 CRITICAL IMPORT RULES:
 
@@ -66,3 +68,4 @@ Before returning the final code, you MUST:
 2. Verify every import based on that path.
 3. Ensure that all imports are relative and correct.
 4. If at least one import is absolute — regenerate the file.
+5. Verify what all files from project structure are exist
