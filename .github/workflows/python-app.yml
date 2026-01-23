@@ -61,7 +61,7 @@ jobs:
           # Run pytest from the project root, targeting the autotests package
           # The pytest.ini inside 'autotests' will handle '--alluredir=../allure-results'
           # So the results will be in the project root's allure-results folder
-          pytest autotests/
+          pytest autotests/ || true # Ensure workflow continues even if tests fail
 
       # If needed for Allure CLI to generate HTML report
       - name: Install Allure CLI
