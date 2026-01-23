@@ -29,10 +29,22 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 pytest allure-pytest
+          pip install flake8 pytest allure-pytest playwright
           if (Test-Path "requirements.txt") {
             pip install -r requirements.txt
           }
+          # Install Playwright browsers - CRITICAL for tests
+          playwright install
+
+      - name: Generate Autotests and Project Structure
+        shell: pwsh
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }} # Pass API key as a secret
+        run: |
+          # Ensure generated directory exists for output files
+          mkdir generated 2>$null
+          # Run the main pipeline to generate autotests and package structure
+          python PiplineMain.py
 
       - name: Lint with flake8
         shell: pwsh
@@ -45,15 +57,17 @@ jobs:
       - name: Test with pytest and collect Allure results
         shell: pwsh
         run: |
-          mkdir generated 2>$null
-          pytest --alluredir=generated/allure-results
+          # Run pytest from the project root, targeting the autotests package
+          # The pytest.ini inside 'autotests' will handle '--alluredir=reports/allure-results'
+          # So the results will be in autotests/reports/allure-results
+          pytest autotests/
 
-      # Если нужен CLI Allure для генерации отчёта HTML
+      # If needed for Allure CLI to generate HTML report
       - name: Install Allure CLI
         shell: pwsh
         run: |
-          # Пример установки через scoop; адаптируй под свой способ,
-          # либо закомментируй этот шаг, если отчёт достаточно смотреть из allure-results.
+          # Example installation via scoop; adapt to your method,
+          # or comment out this step if report is sufficient from allure-results.
           if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
             Set-ExecutionPolicy Bypass -Scope Process -Force
             irm get.scoop.sh | iex
@@ -63,7 +77,9 @@ jobs:
       - name: Generate Allure report
         shell: pwsh
         run: |
-          allure generate generated/allure-results -o generated/allure-report --clean
+          # The Allure results will be in autotests/reports/allure-results
+          # The allure generate command needs to target this path
+          allure generate autotests/reports/allure-results -o autotests/reports/allure-report --clean
 
       - name: Upload AI artifacts and Allure report
         uses: actions/upload-artifact@v4
@@ -71,3 +87,4 @@ jobs:
           name: ai-qa-artifacts
           path: |
             generated/
+            autotests/reports/allure-report/
