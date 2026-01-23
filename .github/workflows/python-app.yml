@@ -90,5 +90,5 @@ jobs:
           name: ai-qa-artifacts
           path: |
             generated/
-            autotests/ # Added autotests project directory
+            autotests/
             allure-results/
